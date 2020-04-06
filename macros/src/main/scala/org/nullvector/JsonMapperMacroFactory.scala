@@ -1,14 +1,10 @@
 package org.nullvector
 
-import play.api.libs.json.{Format, JsValue, Reads, Writes}
+import play.api.libs.json.{Format, JsValue, JsonConfiguration, OFormat, OWrites, Reads, Writes}
 
 import scala.reflect.macros.blackbox
 
 private object JsonMapperMacroFactory {
-
-  implicit class MapOnPair[+T1, +T2](pair: (T1, T2)) {
-    def map[A1, A2](f: (T1, T2) => (A1, A2)): (A1, A2) = f(pair._1, pair._2)
-  }
 
   private val supportedClassTypes = List(
     "scala.Option",
@@ -21,35 +17,67 @@ private object JsonMapperMacroFactory {
 
 
   def writesOf[E](context: blackbox.Context)
-                 (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Writes[E]] = {
+                  (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Writes[E]] = {
+    buildExpression(context, WritesMapperFilter)(None)
+  }
+
+  def writesWithConfigOf[E](context: blackbox.Context)
+                            (jsonConfiguration: context.Expr[JsonConfiguration])
+                            (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Writes[E]] = {
+    buildExpression(context, WritesMapperFilter)(Some(jsonConfiguration))
+  }
+
+  def readsOf[E](context: blackbox.Context)
+                  (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Reads[E]] = {
+    buildExpression(context, ReadsMapperFilter)(None)
+  }
+
+  def readsWithConfigOf[E](context: blackbox.Context)
+                            (jsonConfiguration: context.Expr[JsonConfiguration])
+                            (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Reads[E]] = {
+    buildExpression(context, ReadsMapperFilter)(Some(jsonConfiguration))
+  }
+
+  def mappingOf[E](context: blackbox.Context)
+                  (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Format[E]] = {
+    buildExpression(context, FormatMapperFilter)(None)
+  }
+
+  def mappingWithConfigOf[E](context: blackbox.Context)
+                            (jsonConfiguration: context.Expr[JsonConfiguration])
+                            (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Format[E]] = {
+    buildExpression(context, FormatMapperFilter)(Some(jsonConfiguration))
+  }
+
+  private def buildExpression[E](context: blackbox.Context, mapperFilter: MapperFilter)
+                                (jsonConfiguration: Option[context.Expr[JsonConfiguration]])
+                                (implicit domainTypeTag: context.WeakTypeTag[E]): context.Expr[Format[E]] = {
 
     import context.universe._
-    val typeOfWrites = context.typeOf[Writes[_]]
-    val typeOfReads = context.typeOf[Reads[_]]
-    val typeOfFormat = context.typeOf[Format[_]]
 
+    val (toBeImplicit, toBeMainWriter) = extractTypes(context)(domainTypeTag.tpe).toList.reverse.distinct.partition(_ != domainTypeTag.tpe)
+    val implicitWriters = mapperFilter.filterTypes(context)(toBeImplicit)
 
-    val (toBeImplicit, toBeMainWriter) = extractCaseTypes(context)(domainTypeTag.tpe).toList.reverse.distinct.partition(_ != domainTypeTag.tpe)
-
-    val implicitWriters = toBeImplicit
-      .filter { caseType =>
-        context.inferImplicitValue(appliedType(typeOfWrites, caseType)).isEmpty ||
-        context.inferImplicitValue(appliedType(typeOfFormat, caseType)).isEmpty
-      }
-      .map(caseType => q"""private implicit val ${TermName(context.freshName())} = play.api.libs.json.Json.writes[$caseType] """)
+    val config = jsonConfiguration
+      .map(confExpr => q"private implicit val ${TermName(context.freshName())} = $confExpr")
+      .getOrElse(EmptyTree)
 
     val code =
       q"""
+        import play.api.libs.json._
+        import play.api.libs.json.Json._
+        $config
         ..$implicitWriters
-        play.api.libs.json.Json.writes[${toBeMainWriter.head}]
+        ${mapperFilter.mapperExpression(context)(toBeMainWriter.head)}
        """
-    println(code)
-    context.Expr[Writes[E]](code)
+    context.Expr[Format[E]](code)
   }
 
-  private def extractCaseTypes(context: blackbox.Context)
-                              (caseType: context.universe.Type): org.nullvector.Tree[context.universe.Type] = {
+  private def extractTypes(context: blackbox.Context)
+                          (aType: context.universe.Type): org.nullvector.Tree[context.universe.Type] = {
     import context.universe._
+
+    def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
 
     def extaracCaseClassesFromSupportedTypeClasses(classType: Type): List[Type] = {
       if (supportedClassTypes.contains(classType.typeSymbol.fullName)) classType.typeArgs.collect {
@@ -58,17 +86,70 @@ private object JsonMapperMacroFactory {
       }.flatten else Nil
     }
 
-    if (caseType.typeSymbol.asClass.isCaseClass) {
-      Tree(caseType,
-        caseType.decls.toList
+    val aTypeClass: context.universe.ClassSymbol = aType.typeSymbol.asClass
+
+    if (aTypeClass.isCaseClass) {
+      Tree(aType,
+        aType.decls.toList
           .collect { case method: MethodSymbol if method.isCaseAccessor => method.returnType }
           .collect {
-            case aType if aType.typeSymbol.asClass.isCaseClass => List(extractCaseTypes(context)(aType))
-            case aType => extaracCaseClassesFromSupportedTypeClasses(aType).map(arg => extractCaseTypes(context)(arg))
+            case aType if aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass) => List(extractTypes(context)(aType))
+            case aType => extaracCaseClassesFromSupportedTypeClasses(aType).map(arg => extractTypes(context)(arg))
           }.flatten
       )
     }
+    else if (isSupprtedTrait(aTypeClass)) {
+      Tree(aType, aTypeClass.knownDirectSubclasses.map(aType => extractTypes(context)(aType.asClass.toType)).toList)
+    }
     else Tree.empty
+  }
+
+  sealed trait MapperFilter {
+    def filterTypes(context: blackbox.Context)(types: List[context.Type]): List[context.Tree]
+
+    def mapperExpression(context: blackbox.Context)(tpe: context.Type): context.Tree
+  }
+
+  object FormatMapperFilter extends MapperFilter {
+
+    override def filterTypes(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
+      import context.universe._
+      val typeOfFormat = context.typeOf[Format[_]]
+      types.filter(aType => context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty)
+        .map(aType => context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """))
+    }
+
+    override def mapperExpression(context: blackbox.Context)(tpe: context.Type): context.Tree = {
+      context.parse(s"format[$tpe]")
+    }
+  }
+
+  object WritesMapperFilter extends MapperFilter {
+
+    override def filterTypes(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
+      import context.universe._
+      val typeOfFormat = context.typeOf[Writes[_]]
+      types.filter(aType => context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty)
+        .map(aType => context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """))
+    }
+
+    override def mapperExpression(context: blackbox.Context)(tpe: context.Type): context.Tree = {
+      context.parse(s"writes[$tpe]")
+    }
+  }
+
+  object ReadsMapperFilter extends MapperFilter {
+
+    override def filterTypes(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
+      import context.universe._
+      val typeOfFormat = context.typeOf[Reads[_]]
+      types.filter(aType => context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty)
+        .map(aType => context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = reads[$aType] """))
+    }
+
+    override def mapperExpression(context: blackbox.Context)(tpe: context.Type): context.Tree = {
+      context.parse(s"reads[$tpe]")
+    }
   }
 
 }
