@@ -25,7 +25,7 @@ class JsonMapperSpec extends FlatSpec {
     val jsValue = place.asJson
     jsValue.toString() should include("\"role\":null")
     (jsValue \ "center_location" \ "lat").as[Double] shouldBe 51.235685
-    jsValue.as[Place].name shouldBe place.name
+    jsValue.as[Place].name should be(place.name)
   }
 
   it should "create a writes with a seales trait family" in {
