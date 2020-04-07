@@ -17,6 +17,10 @@ This example use the same model using in play-json examples:
 import play.api.libs.json._
 import JsonMapper._
 
+case class Location(lat: Double, long: Double)
+case class Resident(name: String, age: Int, role: Option[String])
+case class Place(name: String, centerLocation: Location, residents: Seq[Resident])
+
 implicit val w: Writes[Place] = writesOf[Place]
 implicit val r: Reads[Place] = readsOf[Place]
 //or just:
