@@ -1,5 +1,0 @@
-List(2)
-  .intersect(List(2, 4, 5, 6, 7)) match {
-  case Nil =>
-  case ::(head, next) => println(head)
-}
