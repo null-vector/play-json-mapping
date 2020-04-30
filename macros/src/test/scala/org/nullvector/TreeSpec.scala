@@ -1,5 +1,6 @@
 package org.nullvector
 
+import org.nullvector.tree.Tree
 import org.scalatest.{FlatSpec, Matchers}
 
 class TreeSpec extends FlatSpec with Matchers {
@@ -12,12 +13,15 @@ class TreeSpec extends FlatSpec with Matchers {
     val tree: Tree[String] =
       Tree("Auto", List(
         Tree("Puerta", List(Tree("Ventanilla"), Tree("Manija"))),
-        Tree("Motor", List(Tree("Cilindro"), Tree("Injector"))),
+        Tree("Motor", List(Tree("Cilindro"), Tree("Injector"), Tree("Gujia"))),
         Tree("Rueda", List(Tree("Llanta"), Tree("Cubierta"))),
       ))
 
     tree.toList.reverse shouldBe
-      List("Cubierta", "Llanta", "Rueda", "Injector", "Cilindro", "Motor", "Manija", "Ventanilla", "Puerta", "Auto")
+      List("Cubierta", "Llanta", "Rueda", "Gujia", "Injector", "Cilindro", "Motor", "Manija", "Ventanilla", "Puerta", "Auto")
+
+    tree.filterTree(_.contains("o")).toList shouldBe List("Auto", "Motor", "Cilindro", "Injector")
+
   }
 
   it should """ concatenate two Tree """ in {

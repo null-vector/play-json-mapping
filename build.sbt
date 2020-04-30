@@ -1,11 +1,11 @@
 lazy val scala212 = "2.12.9"
-lazy val scala213 = "2.13.1"
+lazy val scala213 = "2.13.2"
 lazy val supportedScalaVersions = List(scala212, scala213)
 
 lazy val commonSettings = Seq(
   name := "play-json-mapping",
   organization := "null-vector",
-  version := "1.0.0",
+  version := "1.0.1",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
   scalacOptions := Seq(

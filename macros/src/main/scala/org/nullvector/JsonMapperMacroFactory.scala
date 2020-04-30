@@ -1,5 +1,6 @@
 package org.nullvector
 
+import org.nullvector.tree.Tree
 import play.api.libs.json.{Format, JsonConfiguration, Reads, Writes}
 
 import scala.reflect.macros.blackbox
@@ -36,21 +37,14 @@ private object JsonMapperMacroFactory {
     buildExpression(context, FormatExpressionFactory)(Some(jsonConfiguration), domainTypeTag)
   }
 
-  private val supportedClassTypes = List(
-    "scala.Option",
-    "scala.collection.immutable.List",
-    "scala.collection.immutable.Seq",
-    "scala.collection.Seq",
-    "scala.collection.immutable.Set",
-    "scala.collection.immutable.Map",
-  )
 
   private def buildExpression[E](context: blackbox.Context, mapperFilter: ExpressionFactory)
                                 (jsonConfiguration: Option[context.Expr[JsonConfiguration]], domainTypeTag: context.WeakTypeTag[E]): context.Expr[Format[E]] = {
 
     import context.universe._
 
-    val (toBeImplicit, toBeMainWriter) = extractTypes(context)(domainTypeTag.tpe).toList.reverse.distinct.partition(_ != domainTypeTag.tpe)
+    val tree = extractTypes(context)(domainTypeTag.tpe).filterTree(mapperFilter.typeNotImplicitDeclared(context)(_, domainTypeTag.tpe))
+    val (toBeImplicit) = tree.toList.reverse.distinct.filterNot(_ =:= domainTypeTag.tpe)
     val implicitWriters = mapperFilter.implicitExpressionsFrom(context)(toBeImplicit)
 
     val config = jsonConfiguration
@@ -63,30 +57,32 @@ private object JsonMapperMacroFactory {
         import play.api.libs.json.Json._
         $config
         ..$implicitWriters
-        ${mapperFilter.mainExpressionFrom(context)(toBeMainWriter.head)}
+        ${mapperFilter.mainExpressionFrom(context)(domainTypeTag.tpe)}
        """
+    //println(code)
     context.Expr[Format[E]](code)
   }
 
   private def extractTypes(context: blackbox.Context)
-                          (aType: context.universe.Type): org.nullvector.Tree[context.universe.Type] = {
+                          (mainType: context.universe.Type): Tree[context.universe.Type] = {
     import context.universe._
 
     def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
 
     def extaracCaseClassesFromSupportedTypeClasses(classType: Type): List[Type] = {
-      if (supportedClassTypes.contains(classType.typeSymbol.fullName)) classType.typeArgs.collect {
+      classType.typeArgs.collect {
         case argType if argType.typeSymbol.asClass.isCaseClass => List(classType, argType)
         case t => extaracCaseClassesFromSupportedTypeClasses(t)
-      }.flatten else Nil
+      }.flatten
     }
 
-    val aTypeClass: context.universe.ClassSymbol = aType.typeSymbol.asClass
+    val aTypeClass: context.universe.ClassSymbol = mainType.typeSymbol.asClass
 
     if (aTypeClass.isCaseClass) {
-      Tree(aType,
-        aType.decls.toList
-          .collect { case method: MethodSymbol if method.isCaseAccessor => method.returnType }
+      val accesors = mainType.decls.toList.collect { case method: MethodSymbol if method.isCaseAccessor => method.returnType }
+      //println(s"$mainType -> $accesors")
+      Tree(mainType,
+        accesors
           .collect {
             case aType if aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass) => List(extractTypes(context)(aType))
             case aType => extaracCaseClassesFromSupportedTypeClasses(aType).map(arg => extractTypes(context)(arg))
@@ -94,12 +90,15 @@ private object JsonMapperMacroFactory {
       )
     }
     else if (isSupprtedTrait(aTypeClass)) {
-      Tree(aType, aTypeClass.knownDirectSubclasses.map(aType => extractTypes(context)(aType.asClass.toType)).toList)
+      Tree(mainType, aTypeClass.knownDirectSubclasses.map(aType => extractTypes(context)(aType.asClass.toType)).toList)
     }
     else Tree.empty
   }
 
   sealed trait ExpressionFactory {
+
+    def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean
+
     def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree]
 
     def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree
@@ -108,42 +107,60 @@ private object JsonMapperMacroFactory {
   private object FormatExpressionFactory extends ExpressionFactory {
 
     override def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
-      import context.universe._
-      val typeOfFormat = context.typeOf[Format[_]]
-      types.filter(aType => context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty)
-        .map(aType => context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """))
+      types.map(aType => context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """))
     }
 
     override def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree = {
       context.parse(s"format[$tpe]")
+    }
+
+    override def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean = {
+      if (aType =:= ignore) true
+      else {
+        import context.universe._
+        val typeOfFormat = context.typeOf[Format[_]]
+        context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty
+      }
     }
   }
 
   private object WritesExpressionFactory extends ExpressionFactory {
 
     override def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
-      import context.universe._
-      val typeOfFormat = context.typeOf[Writes[_]]
-      types.filter(aType => context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty)
-        .map(aType => context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """))
+      types.map(aType => context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """))
     }
 
     override def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree = {
       context.parse(s"writes[$tpe]")
+    }
+
+    override def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean = {
+      if (aType =:= ignore) true
+      else {
+        import context.universe._
+        val typeOfFormat = context.typeOf[Writes[_]]
+        context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty
+      }
     }
   }
 
   private object ReadsExpressionFactory extends ExpressionFactory {
 
     override def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
-      import context.universe._
-      val typeOfFormat = context.typeOf[Reads[_]]
-      types.filter(aType => context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty)
-        .map(aType => context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = reads[$aType] """))
+      types.map(aType => context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = reads[$aType] """))
     }
 
     override def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree = {
       context.parse(s"reads[$tpe]")
+    }
+
+    override def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean = {
+      if (aType =:= ignore) true
+      else {
+        import context.universe._
+        val typeOfFormat = context.typeOf[Reads[_]]
+        context.inferImplicitValue(appliedType(typeOfFormat, aType)).isEmpty
+      }
     }
   }
 

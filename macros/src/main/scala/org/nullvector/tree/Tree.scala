@@ -1,10 +1,14 @@
-package org.nullvector
+package org.nullvector.tree
 
 sealed trait Tree[E] extends Iterable[E] {
 
   def +(tree: Tree[E]): Tree[E]
 
   def iterator: Iterator[E]
+
+  def filterTree(pred: E => Boolean): Tree[E]
+
+  def isEmpty: Boolean
 }
 
 
@@ -16,6 +20,16 @@ class NodeTree[E](root: E, children: List[Tree[E]]) extends Tree[E] {
   }
 
   override def iterator: Iterator[E] = (root :: children.flatMap(_.iterator)).iterator
+
+  override def filterTree(pred: E => Boolean): Tree[E] = {
+    if(pred(root)) new NodeTree(
+      root,
+      children.map(_.filterTree(pred)).filterNot(_.isEmpty)
+    )
+    else Tree.empty
+  }
+
+  override def isEmpty: Boolean = false
 }
 
 
@@ -27,6 +41,10 @@ object Tree {
     override def +(tree: Tree[E]): Tree[E] = tree
 
     override def iterator: Iterator[E] = Iterator.empty
+
+    override def filterTree(pred: E => Boolean): Tree[E] = this
+
+    override def isEmpty: Boolean = true
   }
 
 }
