@@ -80,7 +80,7 @@ private object JsonMapperMacroFactory {
 
     if (aTypeClass.isCaseClass) {
       val accesors = mainType.decls.toList.collect { case method: MethodSymbol if method.isCaseAccessor => method.returnType }
-      //println(s"$mainType -> $accesors")
+      (s"$accesors") //This is the most strange thing that I have never seen in my life...
       Tree(mainType,
         accesors
           .collect {
