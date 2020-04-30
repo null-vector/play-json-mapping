@@ -15,7 +15,7 @@ libraryDependencies += "null-vector" %% "play-json-mapping" % "1.0.x"
 This example use the same model using in play-json examples:
 ```scala
 import play.api.libs.json._
-import JsonMapper._
+import org.nullvector.JsonMapper._
 
 case class Location(lat: Double, long: Double)
 case class Resident(name: String, age: Int, role: Option[String])
