@@ -63,37 +63,50 @@ private object JsonMapperMacroFactory {
     context.Expr[Format[E]](code)
   }
 
+
   private def extractTypes(context: blackbox.Context)
-                          (mainType: context.universe.Type): Tree[context.universe.Type] = {
+                          (rootType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
     import context.universe._
 
-    def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
+    def extractAll(caseType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
 
-    def extaracCaseClassesFromSupportedTypeClasses(classType: Type): List[Type] = {
-      classType.typeArgs.collect {
-        case argType if argType.typeSymbol.asClass.isCaseClass => List(classType, argType)
-        case t => extaracCaseClassesFromSupportedTypeClasses(t)
-      }.flatten
+      def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
+
+      def extaracCaseClassesFromTypeArgs(classType: Type): List[Type] = {
+        classType.typeArgs.collect {
+          case argType if argType.typeSymbol.asClass.isCaseClass => List(classType, argType)
+          case t => extaracCaseClassesFromTypeArgs(t)
+        }.flatten
+      }
+
+      val caseTypeAsClass = caseType.typeSymbol.asClass
+      caseTypeAsClass.toString
+      //println(s"$caseTypeAsClass -- is case class --> ${caseTypeAsClass.isCaseClass}")
+      if (caseTypeAsClass.isCaseClass) {
+        Tree(caseType,
+          caseType.decls.collect { case method: MethodSymbol if method.isCaseAccessor =>
+            val returnType = method.returnType
+            returnType.toString // This is needed to materialize the type (WTF!!)
+            returnType
+          }
+            .collect {
+              case aType if aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass) => List(extractAll(aType))
+              case aType => extaracCaseClassesFromTypeArgs(aType).map(arg => extractAll(arg))
+            }.flatten.toList
+
+        )
+      }
+      else if (isSupprtedTrait(caseTypeAsClass)) {
+        val subclasses = caseTypeAsClass.knownDirectSubclasses
+        //println(s"$caseType -- subclasses --> $subclasses")
+        Tree(caseType, subclasses.map(aType => extractAll(aType.asClass.toType)).toList)
+      }
+      else Tree.empty
     }
 
-    val aTypeClass: context.universe.ClassSymbol = mainType.typeSymbol.asClass
-
-    if (aTypeClass.isCaseClass) {
-      val accesors = mainType.decls.toList.collect { case method: MethodSymbol if method.isCaseAccessor => method.returnType }
-      (s"$accesors") //This is the most strange thing that I have never seen in my life...
-      Tree(mainType,
-        accesors
-          .collect {
-            case aType if aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass) => List(extractTypes(context)(aType))
-            case aType => extaracCaseClassesFromSupportedTypeClasses(aType).map(arg => extractTypes(context)(arg))
-          }.flatten
-      )
-    }
-    else if (isSupprtedTrait(aTypeClass)) {
-      Tree(mainType, aTypeClass.knownDirectSubclasses.map(aType => extractTypes(context)(aType.asClass.toType)).toList)
-    }
-    else Tree.empty
+    extractAll(rootType)
   }
+
 
   sealed trait ExpressionFactory {
 

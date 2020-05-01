@@ -1,6 +1,6 @@
 package org.nullvector
 
-import org.nullvector.domian._
+import org.nullvector.domian.{Location, Monday, OperationSchedule, Place, Resident}
 import org.scalatest.Matchers._
 import org.scalatest._
 import play.api.libs.json.{Format, Json, JsonConfiguration, Reads, Writes}
