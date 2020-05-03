@@ -1,9 +1,10 @@
 package org.nullvector
 
 import org.nullvector.tree.Tree
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class TreeSpec extends FlatSpec with Matchers {
+class TreeSpec extends AnyFlatSpec with Matchers {
 
   it should """ has a root element """ in {
     Tree("Hola").toList shouldBe (List("Hola"))

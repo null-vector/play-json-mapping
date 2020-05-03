@@ -5,7 +5,7 @@ lazy val supportedScalaVersions = List(scala212, scala213)
 lazy val commonSettings = Seq(
   name := "play-json-mapping",
   organization := "null-vector",
-  version := "1.0.2",
+  version := "1.0.3",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
   scalacOptions := Seq(
@@ -20,7 +20,7 @@ lazy val commonSettings = Seq(
   libraryDependencies += "com.typesafe.play" %% "play-json" % "2.8.1",
   libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-  libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+  libraryDependencies += "org.scalatest" %% "scalatest" % "3.1.1" % Test,
   licenses += ("MIT", url("https://opensource.org/licenses/MIT")),
   coverageExcludedPackages := "<empty>",
 

@@ -59,7 +59,7 @@ private object JsonMapperMacroFactory {
         ..$implicitWriters
         ${mapperFilter.mainExpressionFrom(context)(domainTypeTag.tpe)}
        """
-    //println(code)
+    //context.warning(context.enclosingPosition, code.toString())
     context.Expr[Format[E]](code)
   }
 
@@ -67,11 +67,10 @@ private object JsonMapperMacroFactory {
   private def extractTypes(context: blackbox.Context)
                           (rootType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
     import context.universe._
+    val enumType = context.typeOf[Enumeration]
 
     def extractAll(caseType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
-
       def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
-
       def extaracCaseClassesFromTypeArgs(classType: Type): List[Type] = {
         classType.typeArgs.collect {
           case argType if argType.typeSymbol.asClass.isCaseClass => List(classType, argType)
@@ -80,25 +79,27 @@ private object JsonMapperMacroFactory {
       }
 
       val caseTypeAsClass = caseType.typeSymbol.asClass
-      caseTypeAsClass.toString
-      //println(s"$caseTypeAsClass -- is case class --> ${caseTypeAsClass.isCaseClass}")
       if (caseTypeAsClass.isCaseClass) {
         Tree(caseType,
-          caseType.decls.collect { case method: MethodSymbol if method.isCaseAccessor =>
-            val returnType = method.returnType
-            returnType.toString // This is needed to materialize the type (WTF!!)
-            returnType
-          }
+          caseType.decls
+            .collect { case method: MethodSymbol if method.isCaseAccessor =>
+              val returnType = method.returnType
+              returnType.toString // This is needed to materialize the type (WTF!!)
+              returnType
+            }
             .collect {
+              case aType if aType.typeSymbol.owner.isType &&
+                aType.typeSymbol.owner.asType.toType =:= enumType =>
+                List(Tree(aType))
               case aType if aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass) => List(extractAll(aType))
               case aType => extaracCaseClassesFromTypeArgs(aType).map(arg => extractAll(arg))
-            }.flatten.toList
+            }
+            .flatten.toList
 
         )
       }
       else if (isSupprtedTrait(caseTypeAsClass)) {
         val subclasses = caseTypeAsClass.knownDirectSubclasses
-        //println(s"$caseType -- subclasses --> $subclasses")
         Tree(caseType, subclasses.map(aType => extractAll(aType.asClass.toType)).toList)
       }
       else Tree.empty
@@ -110,6 +111,12 @@ private object JsonMapperMacroFactory {
 
   sealed trait ExpressionFactory {
 
+    def enumTypeName(context: blackbox.Context)(aType: context.Type): Option[String] = {
+      val enumType = context.typeOf[Enumeration]
+      if (aType.typeSymbol.owner.asType.toType =:= enumType) Some(aType.toString.split("\\.").dropRight(1).mkString("."))
+      else None
+    }
+
     def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean
 
     def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree]
@@ -120,11 +127,17 @@ private object JsonMapperMacroFactory {
   private object FormatExpressionFactory extends ExpressionFactory {
 
     override def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
-      types.map(aType => context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """))
+      types.map(aType => enumTypeName(context)(aType) match {
+        case Some(enumName) =>
+          context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = formatEnum($enumName) """)
+        case None =>
+          context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """)
+      })
     }
 
     override def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree = {
-      context.parse(s"format[$tpe]")
+      import context.universe._
+      (q"format[$tpe]")
     }
 
     override def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean = {
@@ -140,11 +153,17 @@ private object JsonMapperMacroFactory {
   private object WritesExpressionFactory extends ExpressionFactory {
 
     override def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
-      types.map(aType => context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """))
+      types.map(aType => enumTypeName(context)(aType) match {
+        case Some(enumName) =>
+          context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = Writes.enumNameWrites[$enumName] """)
+        case None =>
+          context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """)
+      })
     }
 
     override def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree = {
-      context.parse(s"writes[$tpe]")
+      import context.universe._
+      (q"writes[$tpe]")
     }
 
     override def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean = {
@@ -160,11 +179,17 @@ private object JsonMapperMacroFactory {
   private object ReadsExpressionFactory extends ExpressionFactory {
 
     override def implicitExpressionsFrom(context: blackbox.Context)(types: List[context.Type]): List[context.Tree] = {
-      types.map(aType => context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = reads[$aType] """))
+      types.map(aType => enumTypeName(context)(aType) match {
+        case Some(enumName) =>
+          context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = Reads.enumNameReads($enumName) """)
+        case None =>
+          context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = reads[$aType] """)
+      })
     }
 
     override def mainExpressionFrom(context: blackbox.Context)(tpe: context.Type): context.Tree = {
-      context.parse(s"reads[$tpe]")
+      import context.universe._
+      (q"reads[$tpe]")
     }
 
     override def typeNotImplicitDeclared(context: blackbox.Context)(aType: context.Type, ignore: context.Type): Boolean = {

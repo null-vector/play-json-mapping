@@ -39,3 +39,14 @@ val place = Place(
 
 val json: JsValue = place.asJson
 ```
+Scala Enumerations are also automatic mapping:
+```scala
+case class Money(amount: BigDecimal, currency: Money.Currency)
+
+object Money extends Enumeration {
+  type Currency = Value
+  val ARS, BRL, USD, MXN = Value
+}
+...
+implicit val moneyMapping: Format[Money] = JsonMapper.mappingOf[Money]
+```

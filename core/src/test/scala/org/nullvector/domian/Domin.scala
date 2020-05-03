@@ -17,3 +17,17 @@ object Day {
 case object Monday extends Day
 
 case object Sunday extends Day
+
+case class Money(amount: BigDecimal, currency: Money.Currency) {
+
+  def +(aMoney: Money): Money = copy(amount + aMoney.amount)
+
+  def *(factor: BigDecimal): Money = copy(amount * factor)
+}
+
+object Money extends Enumeration {
+  type Currency = Value
+  val ARS, BRL, USD, MXN = Value
+
+  def ars(amount: BigDecimal): Money = Money(amount, ARS)
+}
