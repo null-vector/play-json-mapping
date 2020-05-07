@@ -9,7 +9,7 @@ import scala.util.matching.Regex
 
 object JsonMapper {
 
-  private val typeNameRegex: Regex = "^(\\$)?([^\\$\\.]*)(.*)".r
+  private val typeNameRegex: Regex = "^(\\$)?([^$.]*)(.*)".r
 
   val typeNaming: JsonNaming = (property: String) => property.reverse match {
     case typeNameRegex(_, name, _) => name.reverse

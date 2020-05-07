@@ -68,9 +68,11 @@ private object JsonMapperMacroFactory {
                           (rootType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
     import context.universe._
     val enumType = context.typeOf[Enumeration]
+    val anyValType = context.typeOf[AnyVal]
 
     def extractAll(caseType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
       def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
+
       def extaracCaseClassesFromTypeArgs(classType: Type): List[Type] = {
         classType.typeArgs.collect {
           case argType if argType.typeSymbol.asClass.isCaseClass => List(classType, argType)
@@ -88,6 +90,7 @@ private object JsonMapperMacroFactory {
               returnType
             }
             .collect {
+              case aType if aType <:< anyValType => List(Tree(aType))
               case aType if aType.typeSymbol.owner.isType &&
                 aType.typeSymbol.owner.asType.toType =:= enumType =>
                 List(Tree(aType))
@@ -131,7 +134,10 @@ private object JsonMapperMacroFactory {
         case Some(enumName) =>
           context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = formatEnum($enumName) """)
         case None =>
-          context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """)
+          if (aType <:< context.typeOf[AnyVal])
+            context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = valueFormat[$aType] """)
+          else
+            context.parse(s"""private implicit val ${context.freshName()}: Format[$aType] = format[$aType] """)
       })
     }
 
@@ -157,7 +163,10 @@ private object JsonMapperMacroFactory {
         case Some(enumName) =>
           context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = Writes.enumNameWrites[$enumName] """)
         case None =>
-          context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """)
+          if (aType <:< context.typeOf[AnyVal])
+            context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = valueWrites[$aType] """)
+          else
+            context.parse(s"""private implicit val ${context.freshName()}: Writes[$aType] = writes[$aType] """)
       })
     }
 
@@ -183,6 +192,9 @@ private object JsonMapperMacroFactory {
         case Some(enumName) =>
           context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = Reads.enumNameReads($enumName) """)
         case None =>
+          if (aType <:< context.typeOf[AnyVal])
+            context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = valueReads[$aType] """)
+          else
           context.parse(s"""private implicit val ${context.freshName()}: Reads[$aType] = reads[$aType] """)
       })
     }

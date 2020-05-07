@@ -64,5 +64,30 @@ class JsonMapperSpec extends AnyFlatSpec {
       .parse("""{"amount":6783.3211,"currency":"USD"}""")
       .as[Money] shouldBe Money(6783.3211, Money.USD)
   }
+
+  it should "creat mapping with AnyVal" in {
+    import JsonMapper._
+    implicit val m = mappingOf[Product]
+
+    val json = Product(new ProductId(23), "Train").asJson
+    println(json)
+  }
+
+  it should "creat a read mapping with AnyVal" in {
+    import JsonMapper._
+    implicit val m = readsOf[Product]
+
+    Json
+      .parse("""{"productId":23,"name":"Train"}""")
+      .as[Product] shouldBe Product(new ProductId(23), "Train")
+  }
+
+  it should "creat a write mapping with AnyVal" in {
+    import JsonMapper._
+    implicit val m = writesOf[Product]
+
+    Product(new ProductId(23), "Train")
+      .asJson.toString() shouldBe """{"productId":23,"name":"Train"}"""
+  }
 }
 

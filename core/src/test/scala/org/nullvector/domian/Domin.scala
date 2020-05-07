@@ -31,3 +31,8 @@ object Money extends Enumeration {
 
   def ars(amount: BigDecimal): Money = Money(amount, ARS)
 }
+
+
+final class ProductId(val int: Int) extends AnyVal
+
+case class Product(productId: ProductId, name: String)
