@@ -1,6 +1,6 @@
-package org.nullvector
+package org.nullvector.api.json
 
-import org.nullvector.tree.Tree
+import org.nullvector.api.json.tree.Tree
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 

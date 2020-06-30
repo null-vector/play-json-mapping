@@ -1,6 +1,10 @@
-package org.nullvector
+package org.nullvector.api.json
 
-import org.nullvector.domian._
+import java.time.LocalDateTime
+import java.util.Locale
+
+import org.joda.time.DateTime
+import org.nullvector.api.json.domian.{DaysOpen, Location, Monday, Money, OperationSchedule, Place, Product, ProductId, Resident, Sunday, SupportedTypes}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 import play.api.libs.json.{Format, Json, JsonConfiguration, Reads, Writes}
@@ -38,6 +42,16 @@ class JsonMapperSpec extends AnyFlatSpec {
     jsValue.as[OperationSchedule].availableDay shouldBe Monday
   }
 
+  it should "mapping of trait family inside type class" in {
+    import JsonMapper._
+    val example = DaysOpen(List(Monday, Sunday))
+    implicit val conf = JsonConfiguration(typeNaming = typeNaming)
+    implicit val x = mappingOf[DaysOpen]
+    val jsValue = example.asJson
+
+    jsValue.as[DaysOpen] shouldBe example
+  }
+
   it should "create a format mapping with enum" in {
     import JsonMapper._
     implicit val m: Format[Money] = mappingOf[Money]
@@ -67,7 +81,7 @@ class JsonMapperSpec extends AnyFlatSpec {
 
   it should "creat mapping with AnyVal" in {
     import JsonMapper._
-    implicit val m = mappingOf[Product]
+    implicit val m = mappingOf[domian.Product]
 
     val json = Product(new ProductId(23), "Train").asJson
     println(json)
@@ -75,19 +89,20 @@ class JsonMapperSpec extends AnyFlatSpec {
 
   it should "creat a read mapping with AnyVal" in {
     import JsonMapper._
-    implicit val m = readsOf[Product]
+    implicit val m = readsOf[domian.Product]
 
     Json
       .parse("""{"productId":23,"name":"Train"}""")
-      .as[Product] shouldBe Product(new ProductId(23), "Train")
+      .as[domian.Product] shouldBe Product(new ProductId(23), "Train")
   }
 
   it should "creat a write mapping with AnyVal" in {
     import JsonMapper._
-    implicit val m = writesOf[Product]
+    implicit val m = writesOf[domian.Product]
 
     Product(new ProductId(23), "Train")
       .asJson.toString() shouldBe """{"productId":23,"name":"Train"}"""
   }
+
 }
 

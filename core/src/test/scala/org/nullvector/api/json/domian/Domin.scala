@@ -1,4 +1,9 @@
-package org.nullvector.domian
+package org.nullvector.api.json.domian
+
+import java.time.LocalDateTime
+import java.util.Locale
+
+import org.joda.time.DateTime
 
 case class Location(lat: Double, long: Double)
 case class Resident(name: String, age: Int, role: Option[String])
@@ -18,6 +23,8 @@ case object Monday extends Day
 
 case object Sunday extends Day
 
+case class DaysOpen(days: List[Day])
+
 case class Money(amount: BigDecimal, currency: Money.Currency) {
 
   def +(aMoney: Money): Money = copy(amount + aMoney.amount)
@@ -36,3 +43,9 @@ object Money extends Enumeration {
 final class ProductId(val int: Int) extends AnyVal
 
 case class Product(productId: ProductId, name: String)
+
+case class SupportedTypes(
+                           localDateTime: LocalDateTime,
+                           dateTime: DateTime,
+                           locale: Locale
+                         )

@@ -1,6 +1,6 @@
-package org.nullvector
+package org.nullvector.api.json
 
-import org.nullvector.tree.Tree
+import org.nullvector.api.json.tree.{Tree => NTree}
 import play.api.libs.json.{Format, JsonConfiguration, Reads, Writes}
 
 import scala.reflect.macros.blackbox
@@ -65,24 +65,26 @@ private object JsonMapperMacroFactory {
 
 
   private def extractTypes(context: blackbox.Context)
-                          (rootType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
+                          (rootType: context.universe.Type): NTree[context.universe.Type] = {
     import context.universe._
     val enumType = context.typeOf[Enumeration]
     val anyValType = context.typeOf[AnyVal]
 
-    def extractAll(caseType: context.universe.Type): org.nullvector.tree.Tree[context.universe.Type] = {
+    def extractAll(caseType: context.universe.Type): NTree[context.universe.Type] = {
       def isSupprtedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
+      def isCaseOrTrait(aType: context.universe.Type) = aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass)
 
       def extaracCaseClassesFromTypeArgs(classType: Type): List[Type] = {
         classType.typeArgs.collect {
-          case argType if argType.typeSymbol.asClass.isCaseClass => List(classType, argType)
+          case argType if isCaseOrTrait(argType) => List(classType, argType)
           case t => extaracCaseClassesFromTypeArgs(t)
         }.flatten
       }
 
       val caseTypeAsClass = caseType.typeSymbol.asClass
+
       if (caseTypeAsClass.isCaseClass) {
-        Tree(caseType,
+        tree.Tree(caseType,
           caseType.decls
             .collect { case method: MethodSymbol if method.isCaseAccessor =>
               val returnType = method.returnType
@@ -90,22 +92,21 @@ private object JsonMapperMacroFactory {
               returnType
             }
             .collect {
-              case aType if aType <:< anyValType => List(Tree(aType))
+              case aType if aType <:< anyValType => List(NTree(aType))
               case aType if aType.typeSymbol.owner.isType &&
                 aType.typeSymbol.owner.asType.toType =:= enumType =>
-                List(Tree(aType))
-              case aType if aType.typeSymbol.asClass.isCaseClass || isSupprtedTrait(aType.typeSymbol.asClass) => List(extractAll(aType))
+                List(NTree(aType))
+              case aType if isCaseOrTrait(aType) => List(extractAll(aType))
               case aType => extaracCaseClassesFromTypeArgs(aType).map(arg => extractAll(arg))
             }
             .flatten.toList
-
         )
       }
       else if (isSupprtedTrait(caseTypeAsClass)) {
         val subclasses = caseTypeAsClass.knownDirectSubclasses
-        Tree(caseType, subclasses.map(aType => extractAll(aType.asClass.toType)).toList)
+        tree.Tree(caseType, subclasses.map(aType => extractAll(aType.asClass.toType)).toList)
       }
-      else Tree.empty
+      else NTree.empty
     }
 
     extractAll(rootType)

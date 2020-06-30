@@ -1,4 +1,4 @@
-package org.nullvector
+package org.nullvector.api.json
 
 import play.api.libs.json.JsonConfiguration.Aux
 import play.api.libs.json.JsonNaming.SnakeCase

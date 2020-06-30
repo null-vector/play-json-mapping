@@ -1,4 +1,4 @@
-package org.nullvector.tree
+package org.nullvector.api.json.tree
 
 sealed trait Tree[E] extends Iterable[E] {
 
