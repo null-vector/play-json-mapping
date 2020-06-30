@@ -1,7 +1,7 @@
 # Play json Mapping
 Enhance the ability to create writes and reads from complex case classes graph. 
 
-[ ![Download](https://api.bintray.com/packages/null-vector/releases/play-json-mapping/images/download.svg?) ](https://bintray.com/null-vector/releases/play-json-mapping/1.0.0/link)
+[![Download](https://api.bintray.com/packages/null-vector/releases/play-json-mapping/images/download.svg?version=1.0.4)](https://bintray.com/null-vector/releases/play-json-mapping/1.0.4/link)
 
 ## Installation
 Add into your `build.sbt` the following lines:
