@@ -4,10 +4,12 @@ import java.time.LocalDateTime
 import java.util.Locale
 
 import org.joda.time.DateTime
+import org.nullvector.api.json
+import org.nullvector.api.json.domian.Money.Currency
 import org.nullvector.api.json.domian.{DaysOpen, Location, Monday, Money, OperationSchedule, Place, Product, ProductId, Resident, Sunday, SupportedTypes}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-import play.api.libs.json.{Format, Json, JsonConfiguration, Reads, Writes}
+import play.api.libs.json.{Format, JsString, Json, JsonConfiguration, Reads, Writes}
 
 class JsonMapperSpec extends AnyFlatSpec {
 
@@ -79,7 +81,7 @@ class JsonMapperSpec extends AnyFlatSpec {
       .as[Money] shouldBe Money(6783.3211, Money.USD)
   }
 
-  it should "creat mapping with AnyVal" in {
+  it should "create mapping with AnyVal" in {
     import JsonMapper._
     implicit val m = mappingOf[domian.Product]
 
@@ -87,7 +89,7 @@ class JsonMapperSpec extends AnyFlatSpec {
     println(json)
   }
 
-  it should "creat a read mapping with AnyVal" in {
+  it should "create a read mapping with AnyVal" in {
     import JsonMapper._
     implicit val m = readsOf[domian.Product]
 
@@ -96,7 +98,7 @@ class JsonMapperSpec extends AnyFlatSpec {
       .as[domian.Product] shouldBe Product(new ProductId(23), "Train")
   }
 
-  it should "creat a write mapping with AnyVal" in {
+  it should "create a write mapping with AnyVal" in {
     import JsonMapper._
     implicit val m = writesOf[domian.Product]
 
