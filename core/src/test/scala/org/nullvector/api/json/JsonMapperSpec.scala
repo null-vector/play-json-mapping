@@ -10,6 +10,7 @@ import org.nullvector.api.json.domian.{DaysOpen, Location, Monday, Money, Operat
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 import play.api.libs.json.{Format, JsString, Json, JsonConfiguration, Reads, Writes}
+import play.api.libs.json.{Format, JsNumber, JsString, JsValue, Json, JsonConfiguration, Reads, Writes}
 
 class JsonMapperSpec extends AnyFlatSpec {
 
@@ -106,5 +107,20 @@ class JsonMapperSpec extends AnyFlatSpec {
       .asJson.toString() shouldBe """{"productId":23,"name":"Train"}"""
   }
 
+  it should "creat a mapping of Map() with JsValue type" in {
+    import JsonMapper._
+    implicit val m = mappingOf[ValueMap]
+
+    ValueMap(Map("key" -> JsNumber(23)), JsString("a text"))
+      .asJson.toString() shouldBe """ {"values":{"key":23},"default":"a text"} """.trim
+  }
+
+  it should "map List of json values" in {
+    implicit val jl = JsonMapper.readsOf[JsonList]
+  }
+
+  case class ValueMap(values: Map[String, JsValue], default: JsString)
+
+  case class JsonList(list: List[JsValue])
 }
 

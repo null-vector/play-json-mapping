@@ -1,7 +1,7 @@
 package org.nullvector.api.json
 
 import org.nullvector.api.json.tree.{Tree => NTree}
-import play.api.libs.json.{Format, JsonConfiguration, Reads, Writes}
+import play.api.libs.json.{Format, JsValue, JsonConfiguration, Reads, Writes}
 
 import scala.reflect.macros.blackbox
 
@@ -69,6 +69,7 @@ private object JsonMapperMacroFactory {
     import context.universe._
     val enumType = context.typeOf[Enumeration]
     val anyValType = context.typeOf[AnyVal]
+    val jsValueType = context.typeOf[JsValue]
 
     def extractAll(testType: context.universe.Type): NTree[context.universe.Type] = {
       def isSupportedTrait(aTypeClass: ClassSymbol) = aTypeClass.isTrait && aTypeClass.isSealed && !aTypeClass.fullName.startsWith("scala")
@@ -77,6 +78,7 @@ private object JsonMapperMacroFactory {
 
       def extractCaseClassesFromTypeArgs(classType: Type): List[Type] = {
         classType.typeArgs.collect {
+          case aType if aType <:< jsValueType => Nil
           case argType if isCaseOrTrait(argType) => List(classType, argType)
           case t => extractCaseClassesFromTypeArgs(t)
         }.flatten
@@ -93,6 +95,7 @@ private object JsonMapperMacroFactory {
               returnType
             }
             .collect {
+              case aType if aType <:< jsValueType => Nil
               case aType if aType <:< anyValType => List(NTree(aType))
               case aType if aType.typeSymbol.owner.isType && aType.typeSymbol.owner.asType.toType =:= enumType => List(NTree(aType))
               case aType if isCaseOrTrait(aType) => List(extractAll(aType))
