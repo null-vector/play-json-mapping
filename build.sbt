@@ -1,6 +1,10 @@
-lazy val scala212 = "2.12.9"
-lazy val scala213 = "2.13.2"
-lazy val supportedScalaVersions = List(scala212, scala213)
+val scala212 = "2.12.13"
+val scala213 = "2.13.4"
+val supportedScalaVersions = List(scala212, scala213)
+crossScalaVersions := supportedScalaVersions
+publishArtifact := false
+publish := {}
+publishLocal := {}
 
 lazy val commonSettings = Seq(
   name := "play-json-mapping",
@@ -37,6 +41,8 @@ lazy val core = (project in file("core"))
     api)
   .settings(
     commonSettings,
+    publishTo := Some("nullvector" at "https://nullvector.jfrog.io/artifactory/releases"),
+    credentials += Credentials(Path.userHome / ".jfrog" / "credentials"),
     Compile / packageDoc / publishArtifact := false,
     Compile / packageBin / mappings ++= (macros / Compile / packageBin / mappings).value,
     Compile / packageSrc / mappings ++= (macros / Compile / packageSrc / mappings).value,
@@ -48,6 +54,7 @@ lazy val macros = (project in file("macros"))
   .dependsOn(api)
   .settings(
     commonSettings,
+    publishArtifact := false,
     publish := {},
     publishLocal := {}
   )
@@ -55,6 +62,7 @@ lazy val macros = (project in file("macros"))
 lazy val api = (project in file("api"))
   .settings(
     commonSettings,
+    publishArtifact := false,
     publish := {},
     publishLocal := {}
   )

@@ -1,16 +1,16 @@
 # Play json Mapping
 Enhance the ability to create writes and reads from complex case classes graph. 
 
-[ ![Download](https://api.bintray.com/packages/null-vector/releases/play-json-mapping/images/download.svg?version=1.1.2) ](https://bintray.com/null-vector/releases/play-json-mapping/1.1.2/link)
 
 ## Installation
 Add into your `build.sbt` the following lines:
-```scala
-resolvers += Resolver.bintrayRepo("null-vector", "releases")
+```sbt
+resolvers += "null-vector" at "https://nullvector.jfrog.io/artifactory/releases"
+
+libraryDependencies += "null-vector" %% "play-json-mapping" % "<version>"
 ```
-```scala
-libraryDependencies += "null-vector" %% "play-json-mapping" % "1.0.x"
-```
+* [Latest release version](https://nullvector.jfrog.io/artifactory/api/search/latestVersion?g=null-vector&a=play-json-mapping_2.13)
+
 ## Example
 This example use the same model using in play-json examples:
 ```scala
