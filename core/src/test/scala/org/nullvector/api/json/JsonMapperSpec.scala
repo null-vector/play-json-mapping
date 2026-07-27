@@ -38,8 +38,8 @@ class JsonMapperSpec extends AnyFlatSpec {
   it should "create a writes with a seales trait family" in {
     import JsonMapper._
     val operationSchedule = OperationSchedule(Monday)
-    implicit val conf = JsonConfiguration(typeNaming = typeNaming)
-    implicit val x = mappingOf[OperationSchedule]
+    implicit val conf: JsonConfiguration = JsonConfiguration(typeNaming = typeNaming)
+    implicit val x: Format[OperationSchedule] = mappingOf[OperationSchedule]
     val jsValue = operationSchedule.asJson
     (jsValue \ "availableDay" \ "_type").as[String] shouldBe "Monday"
     jsValue.as[OperationSchedule].availableDay shouldBe Monday
@@ -48,8 +48,8 @@ class JsonMapperSpec extends AnyFlatSpec {
   it should "mapping of trait family inside type class" in {
     import JsonMapper._
     val example = DaysOpen(List(Monday, Sunday))
-    implicit val conf = JsonConfiguration(typeNaming = typeNaming)
-    implicit val x = mappingOf[DaysOpen]
+    implicit val conf: JsonConfiguration = JsonConfiguration(typeNaming = typeNaming)
+    implicit val x: Format[DaysOpen] = mappingOf[DaysOpen]
     val jsValue = example.asJson
 
     jsValue.as[DaysOpen] shouldBe example
